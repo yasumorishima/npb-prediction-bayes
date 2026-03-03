@@ -144,6 +144,19 @@ def safe_float(val, fmt: str = ".3f") -> str:
         return ""
 
 
+def safe_pct(val) -> str:
+    """Format K% / BB% (FanGraphs returns as ratio 0.225 or pct 22.5)."""
+    try:
+        if pd.isna(val):
+            return ""
+        v = float(val)
+        if v < 1:
+            v = v * 100
+        return f"{v:.1f}"
+    except (ValueError, TypeError):
+        return ""
+
+
 def main() -> None:
     # Read names CSV
     with open(NAMES_CSV, encoding="utf-8-sig") as f:
@@ -210,6 +223,9 @@ def main() -> None:
                         "prev_ERA": "",
                         "expected_pa": DEFAULT_PA,
                         "expected_ip": "",
+                        "prev_FIP": "",
+                        "prev_K_pct": safe_pct(row.get("K%")),
+                        "prev_BB_pct": safe_pct(row.get("BB%")),
                         "source": source_str,
                     })
                     matched_fg.append(f"{npb_name} ({english_name}, {search_year})")
@@ -238,6 +254,9 @@ def main() -> None:
                         "prev_ERA": era,
                         "expected_pa": "",
                         "expected_ip": exp_ip,
+                        "prev_FIP": safe_float(row.get("FIP"), ".2f"),
+                        "prev_K_pct": safe_pct(row.get("K%")),
+                        "prev_BB_pct": safe_pct(row.get("BB%")),
                         "source": source_str,
                     })
                     matched_fg.append(f"{npb_name} ({english_name}, {search_year})")
@@ -256,6 +275,9 @@ def main() -> None:
                     "prev_ERA": ms.get("prev_ERA", ""),
                     "expected_pa": ms.get("expected_pa", ""),
                     "expected_ip": ms.get("expected_ip", ""),
+                    "prev_FIP": ms.get("prev_FIP", ""),
+                    "prev_K_pct": ms.get("prev_K_pct", ""),
+                    "prev_BB_pct": ms.get("prev_BB_pct", ""),
                     "source": ms.get("source", "manual"),
                 })
                 matched_manual.append(f"{npb_name} (manual)")
@@ -280,6 +302,9 @@ def main() -> None:
                     "prev_ERA": "",
                     "expected_pa": exp_pa,
                     "expected_ip": exp_ip_val,
+                    "prev_FIP": "",
+                    "prev_K_pct": "",
+                    "prev_BB_pct": "",
                     "source": f"{english_name} — no FanGraphs stats found",
                 })
                 unmatched.append(
@@ -289,7 +314,8 @@ def main() -> None:
     # Write output
     fields = [
         "npb_name", "player_type", "origin_league",
-        "prev_wOBA", "prev_ERA", "expected_pa", "expected_ip", "source",
+        "prev_wOBA", "prev_ERA", "expected_pa", "expected_ip",
+        "prev_FIP", "prev_K_pct", "prev_BB_pct", "source",
     ]
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     with open(OUTPUT, "w", encoding="utf-8", newline="") as f:
