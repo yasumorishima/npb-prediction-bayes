@@ -1,39 +1,143 @@
-# NPB 2026 Prediction — Marcel + Bayesian Estimation
+# npb-prediction-bayes
+
+NPB（日本プロ野球）の外国人選手初年度成績をベイズ推定し、チーム順位予測に組み込むプロジェクト。
 
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://npb-prediction-bayes.streamlit.app/)
 
-Marcel法の予測結果をベースに、外国人選手のベイズ推定を追加した NPB 順位予測ダッシュボード。
+---
 
-## Marcel版との違い
+## 何が違うのか — [npb-prediction](https://github.com/yasumorishima/npb-prediction) との比較
 
-| | [npb-prediction](https://github.com/yasumorishima/npb-prediction) | **npb-prediction-bayes**（本リポ） |
+| 項目 | npb-prediction | **npb-prediction-bayes（本リポ）** |
 |---|---|---|
-| 外国人選手の扱い | wRAA=0（リーグ平均） | ベイズ推定（前リーグ成績をNPB変換） |
-| 予測幅 | なし | Monte Carlo simulation（5,000回） |
-| 歴代外国人分析 | なし | 367名の初年度平均データ |
+| 外国人選手の扱い | wRAA = 0（リーグ平均と同じ） | ベイズ推定（前リーグ成績 → NPB換算） |
+| 予測幅（不確実性） | なし | Monte Carlo simulation（5,000回） |
+| 歴代外国人データ | なし | 367名の初年度実績（2015-2025） |
+| 依存リポ | なし | [npb-bayes-projection](https://github.com/yasumorishima/npb-bayes-projection)（後験パラメータ） |
 
-## ページ構成
+**問題意識**: npb-predictionでは新外国人選手をwRAA=0（リーグ平均相当）と仮定している。主力外国人が複数在籍するチームではこの誤差が順位予測に影響しうる。
 
-1. **順位表比較** — Marcel-only vs Marcel+Bayes の勝数を左右に並べて比較
-2. **外国人選手一覧** — 24名の予測詳細（ベイズ推定/歴代平均/前リーグ成績）
-3. **歴代外国人分析** — 367名の初年度平均データ（打者wOBA分布、投手ERA分布）
+---
 
 ## ベイズ推定の仕組み
 
-NPB_stat = w × (prev_stat × cf_i) + (1 - w) × league_avg + noise
+### モデル式
 
-- `w ≈ 0.14`: 前リーグ成績の重み（残りはリーグ平均に回帰）
-- `cf_i`: 個人変換係数（Normal分布）
-- パラメータは [npb-bayes-projection](https://github.com/yasumorishima/npb-bayes-projection) の事後分布から取得
+```
+# 打者
+npb_wOBA = lg_avg + β_woba × z_woba + β_K × z_K + β_BB × z_BB + ε
+
+# 投手
+npb_ERA = lg_avg + β_era × z_era + β_fip × z_fip + β_K × z_K + β_BB × z_BB + ε
+```
+
+特徴量は前リーグでの成績（wOBA / ERA / FIP / K% / BB%）をz-score変換したもの。前リーグ成績がない選手はz=0（= 歴代外国人平均）として扱う。
+
+### 後験パラメータ（npb-bayes-projection Stan v1 モデルから）
+
+| パラメータ | 打者 mean (sd) | 投手 mean (sd) |
+|---|---|---|
+| β_woba / β_era | −0.0104 (0.0073) | +0.0515 (0.1638) |
+| β_K | +0.0043 (0.0074) | −0.1828 (0.1387) |
+| β_BB | −0.0050 (0.0077) | +0.2545 (0.1393) |
+| σ（ノイズ） | 0.0530 (0.0057) | 1.1007 (0.1042) |
+
+- β_woba の前リーグ→NPB寄与は小さく（−0.010）、**NPBリーグ平均への回帰が支配的**
+- 投手β_K（−0.183）は「奪三振が多い投手がNPBでも抑えやすい」傾向を反映
+- σが大きい（打者0.053 / 投手1.10）= 個人差のばらつきも大きい
+
+### 変換係数（重み）
+
+- `w ≈ 0.14`: 前リーグ成績の寄与（残り0.86はリーグ平均への回帰）
+- cmdstanpy 不要 — 後験パラメータをハードコードし、NumPyで Monte Carlo サンプリング
+
+---
+
+## 歴代外国人選手データ（2015-2025）
+
+### 初年度平均実績（367名）
+
+| カテゴリ | 対象 | 平均 | 標準偏差 |
+|---|---|---|---|
+| 打者 wOBA | PA ≥ 50（117名） | .318 | .053 |
+| 投手 ERA | IP ≥ 20（151名） | 3.41 | 1.44 |
+
+前リーグ成績データがない選手（独立リーグ出身等）には、この歴代平均を初期値として使用。
+
+---
+
+## 2026年 外国人選手（24名）
+
+各選手について「ベイズ推定値」「歴代平均」「前リーグ成績」を5,000回サンプリングして予測幅を算出。
+
+出身リーグ構成: MLB / AAA / 独立リーグ / NPB他球団 など。
+
+---
+
+## Streamlitアプリ — 3ページ構成
+
+**https://npb-prediction-bayes.streamlit.app/**
+
+### 1. 順位表比較
+
+Marcel-only（外国人=平均）と Marcel+Bayes（ベイズ補正あり）を左右に並べて比較。チームごとの「ベイズ効果」（勝利数差）と予測幅（80%信頼区間）を表示。
+
+### 2. 外国人選手一覧
+
+24名全員の予測詳細（ベイズ推定値 + 90%信頼区間 / 歴代初年度平均との比較 / 前リーグ成績）。
+
+### 3. 歴代外国人分析
+
+367名の初年度実績データ（2015-2025）を可視化（出身リーグ別分布 / 前リーグ成績とNPB初年度成績の散布図）。
+
+---
+
+## ファイル構成
+
+| ファイル | 内容 |
+|---|---|
+| `streamlit_app.py` | Streamlit ダッシュボード本体（日本語/英語対応） |
+| `foreign_bayes.py` | ベイズ推定モジュール（Monte Carlo サンプリング） |
+| `roster_current.py` | 2026年NPB支配下登録選手名簿 |
+| `config.py` | 対象年度設定 |
+| `translations.py` | 日本語/英語翻訳辞書 |
+
+### データ
+
+| ファイル | 内容 |
+|---|---|
+| `data/foreign_2026.csv` | 2026年外国人選手24名の前リーグ成績 |
+| `data/foreign_historical.csv` | 歴代外国人選手367名の初年度実績（2015-2025） |
+| `data/foreign_2026_names.csv` | 外国人選手の表記ゆれ対応マスタ |
+| `data/projections/` | Marcel法予測CSV（npb-predictionと共有） |
+
+---
+
+## 予測の限界と注意事項
+
+- **前リーグ成績の信頼性**: 少数イニング/独立リーグのデータは信頼区間が広くなる
+- **NPB適応の個人差**: モデルは平均的な変換係数を使用。個人の適応力は反映できない
+- **外国人選手以外**: Marcel法ベース（npb-prediction と同じ）
+
+---
+
+## セットアップ
+
+```bash
+git clone https://github.com/yasumorishima/npb-prediction-bayes
+cd npb-prediction-bayes
+pip install -r requirements.txt
+streamlit run streamlit_app.py
+```
+
+## 関連リポジトリ
+
+| リポジトリ | 内容 |
+|---|---|
+| [npb-prediction](https://github.com/yasumorishima/npb-prediction) | Marcel法ベース版（Stan/Ridge補正含む） |
+| [npb-bayes-projection](https://github.com/yasumorishima/npb-bayes-projection) | ベイズ/Ridge統計モデル（本リポの後験パラメータ生成元） |
 
 ## データソース
 
 - [プロ野球データFreak](https://baseball-data.com)
 - [日本野球機構 NPB](https://npb.jp)
-
-## セットアップ
-
-```bash
-pip install -r requirements.txt
-streamlit run streamlit_app.py
-```
