@@ -324,7 +324,7 @@ def page_standings(data: dict):
 
         with col_bayes:
             st.markdown(f"**{t('marcel_bayes')}**")
-            _render_standings_cards(lg_b, show_range=True)
+            _render_standings_cards(lg_b, show_range=True, marcel_df=lg_m)
             _render_standings_chart(lg_b, show_range=True)
 
     st.info(t("pred_range_brief"))
@@ -332,7 +332,12 @@ def page_standings(data: dict):
         st.markdown(t("method_content"))
 
 
-def _render_standings_cards(lg: pd.DataFrame, show_range: bool = False):
+def _render_standings_cards(lg: pd.DataFrame, show_range: bool = False, marcel_df: pd.DataFrame | None = None):
+    # Build Marcel wins lookup for delta display
+    marcel_wins = {}
+    if marcel_df is not None and not marcel_df.empty:
+        marcel_wins = dict(zip(marcel_df["team"], marcel_df["pred_W"]))
+
     cards = ""
     for i, (_, row) in enumerate(lg.iterrows()):
         glow = NPB_TEAM_GLOW.get(row["team"], "#00e5ff")
@@ -352,6 +357,19 @@ def _render_standings_cards(lg: pd.DataFrame, show_range: bool = False):
         else:
             w_cell = f'<span style="color:#00e5ff;font-size:16px;font-weight:bold;">{row["pred_W"]:.0f}{t("wins_suffix")}</span>'
 
+        # Delta from Marcel (Bayes effect)
+        delta_html = ""
+        if row["team"] in marcel_wins:
+            delta = row["pred_W"] - marcel_wins[row["team"]]
+            if abs(delta) >= 0.1:
+                if delta > 0:
+                    delta_label = t("bayes_delta_pos").format(delta=f"{delta:+.1f}")
+                    delta_color = "#44dd88"
+                else:
+                    delta_label = t("bayes_delta_neg").format(delta=f"{delta:.1f}")
+                    delta_color = "#ff6666"
+                delta_html = f'<span style="color:{delta_color};font-size:10px;font-weight:bold;">{delta_label}</span>'
+
         cards += f"""
         <div style="display:flex;align-items:center;gap:5px;padding:8px 10px;
                     background:#0d0d24;border-left:3px solid {glow};border-radius:5px;
@@ -361,6 +379,7 @@ def _render_standings_cards(lg: pd.DataFrame, show_range: bool = False):
           {w_cell}
           <span style="color:#888;font-size:11px;">{row['pred_L']:.0f}{t("losses_suffix")}</span>
           <span style="color:#aaa;font-size:10px;">.{row['pred_WPCT']:.3f}</span>
+          {delta_html}
         </div>"""
 
     card_h = 60 if show_range else 50

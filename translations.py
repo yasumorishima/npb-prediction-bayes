@@ -28,6 +28,8 @@ TEXTS: dict[str, dict[str, str]] = {
         "pred_wins_label": "予測勝数",
         "pred_range": "幅: {lo}〜{hi}勝",
         "pred_range_brief": "オレンジの縦線 = 予測幅。Monte Carloシミュレーション（5,000回）で算出",
+        "bayes_delta_pos": "+{delta}勝（ベイズ効果）",
+        "bayes_delta_neg": "{delta}勝（ベイズ効果）",
         "standings_info": (
             "⚠️ **これは統計モデルの自動計算結果です。作者の予想・応援とは無関係です。**\n\n"
             "左列: Marcel法のみ（外国人選手はリーグ平均 wRAA=0 で計算）\n"
@@ -102,6 +104,8 @@ TEXTS: dict[str, dict[str, str]] = {
         "pred_wins_label": "Projected Wins",
         "pred_range": "Range: {lo}–{hi}W",
         "pred_range_brief": "Orange bars = prediction range via Monte Carlo simulation (5,000 draws)",
+        "bayes_delta_pos": "+{delta}W (Bayes effect)",
+        "bayes_delta_neg": "{delta}W (Bayes effect)",
         "standings_info": (
             "⚠️ **These are automated statistical model outputs — not the author's predictions.**\n\n"
             "Left column: Marcel-only (foreign players set to league-average wRAA=0)\n"
