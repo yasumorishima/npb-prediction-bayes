@@ -182,6 +182,14 @@ pip install -r requirements.txt
 streamlit run streamlit_app.py
 ```
 
+## 今後の予定
+
+- [ ] **パークファクター補正**: [npb-prediction](https://github.com/yasumorishima/npb-prediction) の試合別スコアデータからPFを自動計算し、球場補正を予測に反映（甲子園・神宮など投手有利球場の過小評価を修正）
+- [ ] 外国人選手初年度実績の集計 → 計算対象外選手への初期値実装
+- [ ] 精度改善（打球データ等の追加特徴量）
+
+---
+
 ## 関連リポジトリ
 
 | リポジトリ | 内容 |
