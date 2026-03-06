@@ -51,6 +51,7 @@ CENTRAL_TEAMS = ["DeNA", "巨人", "阪神", "広島", "中日", "ヤクルト"]
 PACIFIC_TEAMS = ["ソフトバンク", "日本ハム", "楽天", "ロッテ", "オリックス", "西武"]
 
 BASE_URL = "https://raw.githubusercontent.com/yasumorishima/npb-prediction/main/"
+BAYES_PROJ_URL = "https://raw.githubusercontent.com/yasumorishima/npb-bayes-projection/main/"
 
 _VARIANT_MAP = str.maketrans("﨑髙濵澤邊齋齊國島嶋櫻", "崎高浜沢辺斎斉国島島桜")
 
@@ -92,6 +93,42 @@ def load_csv(path: str) -> pd.DataFrame:
     return df
 
 
+@st.cache_data(ttl=3600)
+def _load_stan_csv(path: str) -> pd.DataFrame | None:
+    """Load Stan CSV from npb-bayes-projection. Returns None on failure."""
+    url = BAYES_PROJ_URL + path
+    try:
+        df = pd.read_csv(url, encoding="utf-8-sig")
+    except Exception:
+        return None
+    if "player" in df.columns:
+        df["player"] = df["player"].apply(_norm)
+    return df
+
+
+def _merge_stan_corrections(data: dict) -> None:
+    """Merge Stan (Ridge) delta corrections for Japanese players."""
+    stan_h = _load_stan_csv(f"data/projections/stan_hitters_{TARGET_YEAR}.csv")
+    stan_p = _load_stan_csv(f"data/projections/stan_pitchers_{TARGET_YEAR}.csv")
+
+    mh = data["marcel_hitters"]
+    mp = data["marcel_pitchers"]
+
+    if stan_h is not None and not mh.empty:
+        cols = ["player", "stan_wOBA", "stan_delta_wOBA"]
+        cols = [c for c in cols if c in stan_h.columns]
+        if len(cols) >= 2:
+            stan_cols = stan_h[cols].drop_duplicates("player")
+            data["marcel_hitters"] = mh.merge(stan_cols, on="player", how="left")
+
+    if stan_p is not None and not mp.empty:
+        cols = ["player", "stan_ERA", "stan_delta_ERA"]
+        cols = [c for c in cols if c in stan_p.columns]
+        if len(cols) >= 2:
+            stan_cols = stan_p[cols].drop_duplicates("player")
+            data["marcel_pitchers"] = mp.merge(stan_cols, on="player", how="left")
+
+
 def load_all() -> dict:
     from roster_current import get_all_roster_names, get_team_for_player
 
@@ -113,6 +150,7 @@ def load_all() -> dict:
         result[key] = df
 
     _enrich_woba(result)
+    _merge_stan_corrections(result)
     return result
 
 
@@ -226,7 +264,7 @@ def _build_standings_marcel_only(data: dict) -> pd.DataFrame:
 
 
 def _build_standings_bayes(data: dict, missing_all: dict) -> pd.DataFrame:
-    """Marcel法 + ベイズ推定の順位表"""
+    """Marcel法 + Stan補正 + ベイズ推定の順位表"""
     from foreign_bayes import simulate_team_wins_mc
 
     mh = data["marcel_hitters"]
@@ -237,16 +275,39 @@ def _build_standings_bayes(data: dict, missing_all: dict) -> pd.DataFrame:
     lg_avg_rs = 550.0
     lg_avg_ra = 550.0
     lg_woba, lg_era = _get_league_averages(data)
+    woba_scale = 1.15
 
     if "wRAA_est" not in mh.columns:
         return pd.DataFrame()
+
+    # Apply Stan corrections to wRAA for Japanese hitters
+    has_stan_h = "stan_delta_wOBA" in mh.columns
+    has_stan_p = "stan_delta_ERA" in mp.columns
 
     rows = []
     for team in TEAMS:
         h = mh[mh["team"] == team]
         p = mp[mp["team"] == team]
-        rs_raw = lg_avg_rs + (h["wRAA_est"].sum() if not h.empty else 0)
-        ra_raw = lg_avg_ra + (((p["ERA"] - lg_era) * p["IP"] / 9.0).sum() if not p.empty else 0)
+
+        # Hitters: add Stan delta to wRAA (delta_wOBA * PA / woba_scale)
+        if has_stan_h and not h.empty:
+            stan_wraa = h["wRAA_est"].copy()
+            mask = h["stan_delta_wOBA"].notna()
+            stan_wraa.loc[mask] = stan_wraa.loc[mask] + (
+                h.loc[mask, "stan_delta_wOBA"] / woba_scale * h.loc[mask, "PA"]
+            )
+            rs_raw = lg_avg_rs + stan_wraa.sum()
+        else:
+            rs_raw = lg_avg_rs + (h["wRAA_est"].sum() if not h.empty else 0)
+
+        # Pitchers: use stan_ERA where available
+        if has_stan_p and not p.empty:
+            era_col = p["ERA"].copy()
+            mask = p["stan_delta_ERA"].notna()
+            era_col.loc[mask] = era_col.loc[mask] + p.loc[mask, "stan_delta_ERA"]
+            ra_raw = lg_avg_ra + (((era_col - lg_era) * p["IP"] / 9.0).sum())
+        else:
+            ra_raw = lg_avg_ra + (((p["ERA"] - lg_era) * p["IP"] / 9.0).sum() if not p.empty else 0)
 
         # Bayes foreign player contributions
         team_missing = missing_all.get(team, [])
@@ -550,7 +611,7 @@ def page_historical(data: dict):
 # ==========================================================================
 
 def main():
-    st.set_page_config(page_title="NPB 2026 Marcel+Bayes", layout="wide", page_icon="⚾")
+    st.set_page_config(page_title="NPB 2026 Marcel+Stan/Bayes", layout="wide", page_icon="⚾")
 
     with st.sidebar:
         lang = st.radio(t("lang_toggle"), ["日本語", "English"], key="lang")

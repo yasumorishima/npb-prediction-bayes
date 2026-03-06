@@ -2,8 +2,8 @@
 
 TEXTS: dict[str, dict[str, str]] = {
     "ja": {
-        "app_title": "NPB 2026 予測（Marcel法 + ベイズ推定）",
-        "app_subtitle": "Marcel予測 ＋ 外国人選手のベイズ推定で順位を比較",
+        "app_title": "NPB 2026 予測（Marcel法 + Stan/ベイズ補正）",
+        "app_subtitle": "Marcel予測 ＋ 日本人Stan補正 ＋ 外国人ベイズ推定で順位を比較",
         "lang_toggle": "Language",
 
         # --- Page names ---
@@ -22,28 +22,29 @@ TEXTS: dict[str, dict[str, str]] = {
 
         # --- Standings comparison ---
         "standings_title": "2026年 順位予測比較",
-        "standings_caption": "Marcel法のみ vs Marcel法＋ベイズ推定（外国人選手込み）",
+        "standings_caption": "Marcel法のみ vs Marcel法＋Stan/ベイズ補正（日本人Stan＋外国人ベイズ）",
         "marcel_only": "Marcel法のみ",
-        "marcel_bayes": "Marcel法 + ベイズ推定",
+        "marcel_bayes": "Marcel + Stan/Bayes",
         "pred_wins_label": "予測勝数",
         "pred_range": "幅: {lo}〜{hi}勝",
         "pred_range_brief": "オレンジの縦線 = 予測幅。Monte Carloシミュレーション（5,000回）で算出",
-        "bayes_delta_pos": "+{delta}勝（ベイズ効果）",
-        "bayes_delta_neg": "{delta}勝（ベイズ効果）",
+        "bayes_delta_pos": "+{delta}勝（Stan/Bayes効果）",
+        "bayes_delta_neg": "{delta}勝（Stan/Bayes効果）",
         "standings_info": (
             "⚠️ **これは統計モデルの自動計算結果です。作者の予想・応援とは無関係です。**\n\n"
             "左列: Marcel法のみ（外国人選手はリーグ平均 wRAA=0 で計算）\n"
-            "右列: Marcel法＋ベイズ推定（外国人選手の前リーグ成績を変換して加味）"
+            "右列: Marcel法＋Stan補正（日本人選手のK%/BB%/BABIPで補正）＋ベイズ推定（外国人選手の前リーグ成績を変換）"
         ),
         "method_expander": "予測方法の説明",
         "method_content": (
             "**Marcel法のみ（左列）**\n"
             "- 過去3年のNPB成績を5:4:3で加重平均し、年齢で調整\n"
             "- NPBでの過去データがない選手の貢献はwRAA=0（リーグ平均）として扱う\n\n"
-            "**Marcel法＋ベイズ推定（右列）**\n"
-            "- Marcel法の結果をベースに、NPBデータがない外国人選手にベイズ推定を適用\n"
-            "- 前リーグ成績（wOBA/ERA）をNPBスケールに変換（Shrinkageモデル）\n"
-            "- 前リーグ成績がない外国人は歴代NPB外国人初年度平均を使用\n"
+            "**Marcel + Stan/Bayes（右列）**\n"
+            "- **日本人選手Stan補正**: Marcel予測にRidge回帰で補正（K%/BB%/BABIP/年齢/安定度）\n"
+            "  - LOO-CV 2018-2025: wOBA p=0.060, ERA p=0.057（Bootstrap 97%で有意）\n"
+            "- **外国人選手ベイズ推定**: 前リーグ成績（wOBA/ERA）をNPBスケールに変換\n"
+            "  - 前リーグ成績がない外国人は歴代NPB外国人初年度平均を使用\n"
             "- 予測幅はMonte Carloシミュレーション（5,000回）で算出\n\n"
             "**ピタゴラス勝率**: 得点^1.72 ÷ (得点^1.72 + 失点^1.72) × 143試合"
         ),
@@ -78,8 +79,8 @@ TEXTS: dict[str, dict[str, str]] = {
     },
 
     "en": {
-        "app_title": "NPB 2026 Predictions (Marcel + Bayesian)",
-        "app_subtitle": "Marcel projections + Bayesian foreign player estimation",
+        "app_title": "NPB 2026 Predictions (Marcel + Stan/Bayesian)",
+        "app_subtitle": "Marcel projections + Stan correction (Japanese) + Bayesian estimation (foreign)",
         "lang_toggle": "Language",
 
         # --- Page names ---
@@ -98,28 +99,29 @@ TEXTS: dict[str, dict[str, str]] = {
 
         # --- Standings comparison ---
         "standings_title": "2026 Projected Standings Comparison",
-        "standings_caption": "Marcel-only vs Marcel + Bayesian estimation (with foreign players)",
+        "standings_caption": "Marcel-only vs Marcel + Stan/Bayesian (Japanese Stan + foreign Bayes)",
         "marcel_only": "Marcel Only",
-        "marcel_bayes": "Marcel + Bayesian",
+        "marcel_bayes": "Marcel + Stan/Bayes",
         "pred_wins_label": "Projected Wins",
         "pred_range": "Range: {lo}–{hi}W",
         "pred_range_brief": "Orange bars = prediction range via Monte Carlo simulation (5,000 draws)",
-        "bayes_delta_pos": "+{delta}W (Bayes effect)",
-        "bayes_delta_neg": "{delta}W (Bayes effect)",
+        "bayes_delta_pos": "+{delta}W (Stan/Bayes)",
+        "bayes_delta_neg": "{delta}W (Stan/Bayes)",
         "standings_info": (
             "⚠️ **These are automated statistical model outputs — not the author's predictions.**\n\n"
             "Left column: Marcel-only (foreign players set to league-average wRAA=0)\n"
-            "Right column: Marcel + Bayesian (foreign player prior stats converted to NPB scale)"
+            "Right column: Marcel + Stan correction (Japanese K%/BB%/BABIP) + Bayesian (foreign player prior stats)"
         ),
         "method_expander": "Methodology",
         "method_content": (
             "**Marcel Only (left column)**\n"
             "- 3-year weighted average (5:4:3) of NPB stats with age adjustment\n"
             "- Players without NPB history are treated as wRAA=0 (league average)\n\n"
-            "**Marcel + Bayesian (right column)**\n"
-            "- Marcel projections as base, Bayesian estimation for foreign newcomers\n"
-            "- Prior league stats (wOBA/ERA) converted to NPB scale (Shrinkage model)\n"
-            "- Foreign players without prior stats use historical NPB foreign 1st-year averages\n"
+            "**Marcel + Stan/Bayes (right column)**\n"
+            "- **Japanese Stan correction**: Ridge regression adjusts Marcel using K%/BB%/BABIP/age/stability\n"
+            "  - LOO-CV 2018-2025: wOBA p=0.060, ERA p=0.057 (Bootstrap 97% significant)\n"
+            "- **Foreign Bayesian estimation**: Prior league stats (wOBA/ERA) converted to NPB scale\n"
+            "  - Foreign players without prior stats use historical NPB foreign 1st-year averages\n"
             "- Prediction ranges from Monte Carlo simulation (5,000 draws)\n\n"
             "**Pythagorean Win%**: RS^1.72 / (RS^1.72 + RA^1.72) × 143 games"
         ),
