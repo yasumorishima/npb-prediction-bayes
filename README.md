@@ -187,7 +187,30 @@ streamlit run streamlit_app.py
 - [ ] **パークファクター補正**: [npb-prediction](https://github.com/yasumorishima/npb-prediction) の試合別スコアデータからPFを自動計算し、球場補正を予測に反映（甲子園・神宮など投手有利球場の過小評価を修正）
 - [ ] 外国人選手初年度実績の集計 → 計算対象外選手への初期値実装
 - [ ] 精度改善（打球データ等の追加特徴量）
-- [ ] GCP統合 — BigQuery データロード + BQML モデル + Cloud Run API（[npb-prediction](https://github.com/yasumorishima/npb-prediction) と同パターンで構築予定）
+- [x] GCP統合 — BigQuery `npb_bayes` データセットに6テーブル（6,504行）をロード済み。ベイズ推定はStan後験パラメータ依存のためBQMLは不要、APIはStreamlitで十分なためCloud Runも不要
+
+---
+
+### GCP 分析基盤（BigQuery）
+
+全データを Google BigQuery に集約し、npb-prediction 等とのクロス分析を可能にしています。
+
+| 項目 | 値 |
+|---|---|
+| GCP プロジェクト | `data-platform-490901` |
+| データセット | `npb_bayes` |
+| テーブル数 | 6（6,504行） |
+
+| テーブル | 内容 | 行数 |
+|---|---|---|
+| `foreign_historical` | 外国人選手初年度実績（2015-2025） | 365 |
+| `foreign_2026` | 2026年新外国人の前リーグ成績 | 24 |
+| `foreign_2026_names` | 2026年新外国人の名前マッピング | 24 |
+| `marcel_hitters_2026` | Marcel法打者予測（npb-predictionから） | 463 |
+| `marcel_pitchers_2026` | Marcel法投手予測（npb-predictionから） | 513 |
+| `npb_sabermetrics` | セイバーメトリクス（2015-2025） | 5,115 |
+
+> BQML モデルは構築していません。ベイズ推定は [npb-stan-research](https://github.com/yasumorishima/npb-stan-research) のStan後験パラメータに依存しており、SQLベースのBQMLでは再現が困難なためです。
 
 ---
 
